@@ -2,47 +2,25 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>AI 졸음 방지 출석 시스템 시뮬레이터</title>
+  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
-    body {
-      font-family: 'Segoe UI', sans-serif;
-      background-color: #0f172a;
-      color: #e2e8f0;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 { color: #60a5fa; }
-    .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
-    .card {
-      background: #1e293b;
-      border-radius: 20px;
-      padding: 20px;
-      width: 300px;
-      box-shadow: 0 0 20px rgba(0,0,0,0.3);
-    }
-    input[type=range] { width: 100%; }
-    button {
-      background-color: #3b82f6;
-      color: white;
-      border: none;
-      border-radius: 10px;
-      padding: 10px 20px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
-    button:hover { background-color: #2563eb; }
-    canvas { background: #1e293b; border-radius: 15px; padding: 10px; }
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      color: #f8fafc;
-    }
-    th, td { border: 1px solid #475569; padding: 5px; }
-    th { background-color: #334155; }
+    body{font-family: 'Segoe UI',sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:20px}
+    h1{color:#60a5fa;text-align:center}
+    .container{display:flex;flex-wrap:wrap;justify-content:center;gap:20px}
+    .card{background:#1e293b;border-radius:12px;padding:16px;width:320px;box-shadow:0 6px 18px rgba(0,0,0,0.3)}
+    input[type=range]{width:100%}
+    button{background:#3b82f6;color:#fff;border:none;border-radius:8px;padding:8px 12px;cursor:pointer}
+    button.secondary{background:#64748b}
+    table{width:90%;margin:18px auto;border-collapse:collapse;color:#e2e8f0}
+    th,td{border:1px solid #334155;padding:6px;text-align:center}
+    th{background:#0b1220}
+    #webcam{border-radius:8px;background:#000;display:block;margin:0 auto}
+    #monitor p{margin:6px 0;font-weight:600}
+    .small{font-size:0.9rem;color:#9ca3af}
   </style>
 </head>
 <body>
@@ -50,118 +28,160 @@
 
   <div class="container">
     <div class="card">
-      <h3>졸음 감지 시뮬레이션</h3>
-      <p>눈 감은 시간 (초): <span id="eyeTimeVal">0</span></p>
-      <input type="range" id="eyeTime" min="0" max="15" value="0">
-      <p>고개 각도 (도): <span id="angleVal">0</span></p>
-      <input type="range" id="angle" min="0" max="90" value="0">
-      <p>움직임 감지:</p>
-      <label><input type="checkbox" id="movement"> 움직임 있음</label>
-      <button id="startDetect">감지 시작</button>
-      <p id="status">상태: 대기 중...</p>
+      <h3>시뮬레이터 제어</h3>
+      <p class="small">눈 감은 시간 (초): <span id="eyeTimeVal">0</span></p>
+      <input id="eyeTime" type="range" min="0" max="15" value="0">
+      <p class="small">고개 각도 (°): <span id="angleVal">0</span></p>
+      <input id="angle" type="range" min="0" max="90" value="0">
+      <p class="small"><label><input id="movement" type="checkbox"> 움직임 있음</label></p>
+      <div style="display:flex;gap:8px;">
+        <button id="startDetect">감지 시작</button>
+        <button class="secondary" id="stopDetect">감지 중지</button>
+      </div>
+      <p id="status" class="small">상태: 대기 중</p>
     </div>
 
     <div class="card">
-      <h3>교사용 모니터 화면</h3>
-      <div id="monitor"></div>
+      <h3>교사용 모니터</h3>
+      <div id="monitor"><p class="small">아직 감지 데이터 없음</p></div>
+      <canvas id="sleepChart" width="300" height="180" style="margin-top:12px;background:#0b1220;border-radius:8px"></canvas>
     </div>
 
     <div class="card">
-      <h3>카메라 테스트</h3>
-      <video id="webcam" autoplay playsinline width="250" height="200" style="border-radius:10px; background:#000;"></video>
+      <h3>웹캠 테스트</h3>
+      <video id="webcam" autoplay playsinline width="280" height="200"></video>
+      <p id="cameraMsg" class="small">웹캠 권한 요청 대기...</p>
     </div>
   </div>
 
-  <h2>출석 명단</h2>
+  <h2 style="text-align:center;margin-top:18px">출석 명단 (9학년 3반)</h2>
   <table>
     <thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th></tr></thead>
     <tbody id="studentList"></tbody>
   </table>
 
-  <h2>졸음 감지 통계</h2>
-  <canvas id="sleepChart" width="400" height="200"></canvas>
+<script>
+document.addEventListener('DOMContentLoaded', ()=> {
+  // 학생 목록 (요청 반영: 22번 전출, 35번 전입)
+  const students = [
+    {num:1,name:'고은지'},{num:2,name:'권연서'},{num:3,name:'김가남'},{num:4,name:'김건우'},
+    {num:5,name:'김나연'},{num:6,name:'김현중'},{num:7,name:'김형민'},{num:8,name:'김효민'},
+    {num:9,name:'남시은'},{num:10,name:'박찬서'},{num:11,name:'박하을'},{num:12,name:'박호열'},
+    {num:13,name:'성하윤'},{num:14,name:'신주아'},{num:15,name:'신채아'},{num:16,name:'심인성'},
+    {num:17,name:'양지우'},{num:18,name:'이민호'},{num:19,name:'이성아'},{num:20,name:'이소이'},
+    {num:21,name:'이학현'},{num:22,name:'장윤서(전출)'},{num:23,name:'정예은'},{num:24,name:'정윤호'},
+    {num:25,name:'정지후'},{num:26,name:'정태윤'},{num:27,name:'조동호'},{num:28,name:'조수민'},
+    {num:29,name:'조현아'},{num:30,name:'최재민'},{num:31,name:'최재성'},{num:32,name:'허민'},
+    {num:33,name:'허승원'},{num:34,name:'홍성민'},{num:35,name:'강연두(전입)'}
+  ];
 
-  <script>
-    const students = [
-      {num:1,name:'고은지'},{num:2,name:'권연서'},{num:3,name:'김가남'},{num:4,name:'김건우'},
-      {num:5,name:'김나연'},{num:6,name:'김현중'},{num:7,name:'김형민'},{num:8,name:'김효민'},
-      {num:9,name:'남시은'},{num:10,name:'박찬서'},{num:11,name:'박하을'},{num:12,name:'박호열'},
-      {num:13,name:'성하윤'},{num:14,name:'신주아'},{num:15,name:'신채아'},{num:16,name:'심인성'},
-      {num:17,name:'양지우'},{num:18,name:'이민호'},{num:19,name:'이성아'},{num:20,name:'이소이'},
-      {num:21,name:'이학현'},{num:22,name:'장윤서(전출)'},{num:23,name:'정예은'},{num:24,name:'정윤호'},
-      {num:25,name:'정지후'},{num:26,name:'정태윤'},{num:27,name:'조동호'},{num:28,name:'조수민'},
-      {num:29,name:'조현아'},{num:30,name:'최재민'},{num:31,name:'최재성'},{num:32,name:'허민'},
-      {num:33,name:'허승원'},{num:34,name:'홍성민'},{num:35,name:'강연두(전입)'}
-    ];
+  const tbody = document.getElementById('studentList');
+  students.forEach(s=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML = `<td>9</td><td>3</td><td>${s.num}</td><td>${s.name}</td>`;
+    tbody.appendChild(tr);
+  });
 
-    const tbody = document.getElementById('studentList');
-    students.forEach(s => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td>9</td><td>3</td><td>${s.num}</td><td>${s.name}</td>`;
-      tbody.appendChild(tr);
-    });
+  // UI 요소
+  const eye = document.getElementById('eyeTime');
+  const angle = document.getElementById('angle');
+  const movement = document.getElementById('movement');
+  const eyeTimeVal = document.getElementById('eyeTimeVal');
+  const angleVal = document.getElementById('angleVal');
+  const status = document.getElementById('status');
+  const monitor = document.getElementById('monitor');
 
-    const monitor = document.getElementById('monitor');
-    const eye = document.getElementById('eyeTime');
-    const angle = document.getElementById('angle');
-    const move = document.getElementById('movement');
-    const status = document.getElementById('status');
+  eye.addEventListener('input', ()=> eyeTimeVal.textContent = eye.value);
+  angle.addEventListener('input', ()=> angleVal.textContent = angle.value);
 
-    let sleepData = new Array(students.length).fill(0);
+  // 통계 데이터
+  let sleepData = new Array(students.length).fill(0);
 
-    function detect(){
-      const eyeTime = parseInt(eye.value);
-      const headAngle = parseInt(angle.value);
-      const moving = move.checked;
-      document.getElementById('eyeTimeVal').textContent = eyeTime;
-      document.getElementById('angleVal').textContent = headAngle;
-      if(eyeTime >= 5 && headAngle >= 30 && !moving){
-        status.textContent = '상태: 졸음 감지 🚨';
-        status.style.color = '#f87171';
-        const sleepyStudent = Math.floor(Math.random()*students.length);
-        monitor.innerHTML = `<p>${students[sleepyStudent].num}번 ${students[sleepyStudent].name} 졸음 감지 🚨</p>`;
-        sleepData[sleepyStudent]++;
-        updateChart();
-      } else {
-        status.textContent = '상태: 집중 중 ✅';
-        status.style.color = '#4ade80';
-      }
-    }
-
-    document.getElementById('startDetect').addEventListener('click', ()=>{
-      setInterval(detect, 2000); // 2초마다 감지 반복
-    });
-
-    const ctx = document.getElementById('sleepChart').getContext('2d');
-    const chart = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: students.map(s => s.num + '번'),
-        datasets: [{
-          label: '졸음 감지 횟수',
+  // Chart.js 초기화 (안정성: Chart가 준비되었는지 확인)
+  const ctx = document.getElementById('sleepChart').getContext('2d');
+  let sleepChart;
+  try {
+    sleepChart = new Chart(ctx, {
+      type:'bar',
+      data:{
+        labels: students.map(s=> `${s.num}번`),
+        datasets:[{
+          label:'졸음 감지 횟수',
           data: sleepData,
           backgroundColor: '#60a5fa'
         }]
       },
-      options: {
-        scales: {
-          x: { ticks: { color: '#e2e8f0' } },
-          y: { ticks: { color: '#e2e8f0' } }
+      options:{
+        responsive:true,
+        scales:{
+          x:{ ticks:{ color:'#e2e8f0' } },
+          y:{ ticks:{ color:'#e2e8f0' }, beginAtZero:true }
         },
-        plugins: { legend: { labels: { color: '#e2e8f0' } } }
+        plugins:{ legend:{ labels:{ color:'#e2e8f0' } } }
       }
     });
+  } catch(e){
+    console.error('Chart.js 초기화 실패:', e);
+  }
 
-    function updateChart(){
-      chart.data.datasets[0].data = sleepData;
-      chart.update();
+  function updateChart(){
+    if(sleepChart){
+      sleepChart.data.datasets[0].data = sleepData;
+      sleepChart.update();
     }
+  }
 
-    // 웹캠 연결 테스트
-    const webcam = document.getElementById('webcam');
+  // 감지 루프 제어 (중복 방지)
+  let intervalId = null;
+  function detectOnce(){
+    const eyeTime = parseInt(eye.value,10);
+    const headAngle = parseInt(angle.value,10);
+    const moving = movement.checked;
+
+    // 감지 조건: eye >=5초, angle>=30도, 움직임 없을 때
+    if(eyeTime >= 5 && headAngle >= 30 && !moving){
+      // 임시: 랜덤 학생을 졸음으로 선택 (실제 시스템이면 얼굴 인식 결과 사용)
+      const idx = Math.floor(Math.random()*students.length);
+      sleepData[idx]++;
+      monitor.innerHTML = `<p>${students[idx].num}번 ${students[idx].name} 졸음 감지 🚨</p>`;
+      status.textContent = '상태: 졸음 감지 🚨';
+      status.style.color = '#f87171';
+      updateChart();
+    } else {
+      status.textContent = '상태: 정상/집중';
+      status.style.color = '#34d399';
+    }
+  }
+
+  document.getElementById('startDetect').addEventListener('click', ()=>{
+    if(intervalId !== null){ return; } // 이미 실행 중이면 중복 방지
+    // 즉시 1회 실행하고, 이후 반복
+    detectOnce();
+    intervalId = setInterval(detectOnce, 2000);
+  });
+
+  document.getElementById('stopDetect').addEventListener('click', ()=>{
+    if(intervalId !== null){ clearInterval(intervalId); intervalId = null; status.textContent='상태: 감지 중지'; status.style.color='#94a3b8'; }
+  });
+
+  // 웹캠 연결 (권한/예외 처리 포함)
+  const webcam = document.getElementById('webcam');
+  const cameraMsg = document.getElementById('cameraMsg');
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
     navigator.mediaDevices.getUserMedia({video:true})
-      .then(stream => { webcam.srcObject = stream; })
-      .catch(err => { console.log('웹캠 접근 불가', err); });
-  </script>
+      .then(stream=>{
+        webcam.srcObject = stream;
+        cameraMsg.textContent = '웹캠 연결됨';
+      })
+      .catch(err=>{
+        console.warn('웹캠 접근 불가:', err);
+        cameraMsg.textContent = '웹캠 접근 불가 (권한 또는 장치 없음)';
+      });
+  } else {
+    cameraMsg.textContent = '이 브라우저는 웹캠을 지원하지 않습니다.';
+  }
+
+}); // DOMContentLoaded end
+</script>
 </body>
 </html>
