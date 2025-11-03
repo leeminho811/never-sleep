@@ -1,141 +1,167 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI 졸음 방지 출석 시스템 시뮬레이터</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    html,body{height:100%;font-family:Inter,'Noto Sans KR',sans-serif;background:#f7fafc;color:#111827}
-    .wrap{max-width:1000px;margin:28px auto;padding:20px}
-    header{display:flex;align-items:center;gap:16px}
-    .logo{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#60a5fa);display:flex;align-items:center;justify-content:center;color:white;font-weight:700}
-    h1{font-size:1.4rem}
-    p.lead{color:#4b5563;margin-top:4px}
-    main{display:grid;grid-template-columns:1fr 340px;gap:18px;margin-top:18px}
-    .card{background:white;border-radius:12px;padding:16px;box-shadow:0 6px 18px rgba(17,24,39,0.06)}
-    label{font-size:0.9rem;color:#334155}
-    input[type=range],input[type=number]{width:100%}
-    .btn{margin-top:8px;padding:8px 12px;border:none;border-radius:10px;background:#0ea5e9;color:white;cursor:pointer;font-weight:500}
-    .btn.secondary{background:#94a3b8}
-    .result{min-height:160px;display:flex;flex-direction:column;gap:12px}
-    .big{font-size:1.6rem;font-weight:700}
-    .small{color:#475569}
-    #alertBox{display:none;padding:12px;border-radius:8px;background:#fee2e2;color:#b91c1c;font-weight:600;text-align:center;animation:blink 0.6s infinite alternate}
-    @keyframes blink{0%{opacity:0.6}100%{opacity:1}}
-    #teacherPanel{display:none;margin-top:12px;padding:10px;background:#f1f5f9;border-radius:8px}
-    footer{margin-top:18px;color:#6b7280;font-size:0.85rem;text-align:center}
-    @media(max-width:800px){main{grid-template-columns:1fr}}
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-color: #0f172a;
+      color: #e2e8f0;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { color: #60a5fa; }
+    .container { display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+    .card {
+      background: #1e293b;
+      border-radius: 20px;
+      padding: 20px;
+      width: 300px;
+      box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+    input[type=range] { width: 100%; }
+    button {
+      background-color: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 20px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #2563eb; }
+    canvas { background: #1e293b; border-radius: 15px; padding: 10px; }
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      color: #f8fafc;
+    }
+    th, td { border: 1px solid #475569; padding: 5px; }
+    th { background-color: #334155; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <header>
-      <div class="logo">AI</div>
-      <div>
-        <h1>AI 졸음 방지 출석 시스템</h1>
-        <p class="lead">얼굴 인식 · 출석 연동 · 졸음 감지 · 통계 시뮬레이터</p>
-      </div>
-    </header>
+  <h1>AI 졸음 방지 출석 시스템 시뮬레이터</h1>
 
-    <main>
-      <section class="card">
-        <h2>감지 시뮬레이션 제어판</h2>
-        <label for="eye">눈 감은 시간 (초): <span id="eyeVal">0</span></label>
-        <input id="eye" type="range" min="0" max="10" value="0" />
+  <div class="container">
+    <div class="card">
+      <h3>졸음 감지 시뮬레이션</h3>
+      <p>눈 감은 시간 (초): <span id="eyeTimeVal">0</span></p>
+      <input type="range" id="eyeTime" min="0" max="15" value="0">
+      <p>고개 각도 (도): <span id="angleVal">0</span></p>
+      <input type="range" id="angle" min="0" max="90" value="0">
+      <p>움직임 감지:</p>
+      <label><input type="checkbox" id="movement"> 움직임 있음</label>
+      <button id="startDetect">감지 시작</button>
+      <p id="status">상태: 대기 중...</p>
+    </div>
 
-        <label for="angle">고개 각도 (°): <span id="angleVal">0</span></label>
-        <input id="angle" type="range" min="0" max="90" value="0" />
+    <div class="card">
+      <h3>교사용 모니터 화면</h3>
+      <div id="monitor"></div>
+    </div>
 
-        <label><input id="motion" type="checkbox" /> 움직임 있음</label>
-
-        <button class="btn" id="simulate">감지 시작</button>
-        <button class="btn secondary" id="reset">초기화</button>
-      </section>
-
-      <aside class="card">
-        <h2>결과</h2>
-        <div id="alertBox">🚨 졸음 감지됨! (조용한 알람 작동)</div>
-        <div class="result">
-          <div><span class="big" id="status">대기 중</span></div>
-          <div class="small" id="desc">눈 감은 시간과 고개 각도를 조절해 시뮬레이션하세요.</div>
-          <div>
-            <button class="btn" id="teacherBtn">교사 모니터 보기</button>
-            <div id="teacherPanel">
-              <strong>교사 모니터</strong>
-              <ul id="studentList">
-                <li>1번 학생: 정상</li>
-                <li>2번 학생: 정상</li>
-                <li>3번 학생: 정상</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </aside>
-    </main>
-
-    <footer>
-      이 웹은 실제 하드웨어 대신 눈 감음, 고개 각도, 움직임을 가상으로 조정하여 AI 졸음 감지 시스템의 원리를 체험할 수 있도록 만든 시뮬레이터입니다.
-    </footer>
+    <div class="card">
+      <h3>카메라 테스트</h3>
+      <video id="webcam" autoplay playsinline width="250" height="200" style="border-radius:10px; background:#000;"></video>
+    </div>
   </div>
 
+  <h2>출석 명단</h2>
+  <table>
+    <thead><tr><th>학년</th><th>반</th><th>번호</th><th>이름</th></tr></thead>
+    <tbody id="studentList"></tbody>
+  </table>
+
+  <h2>졸음 감지 통계</h2>
+  <canvas id="sleepChart" width="400" height="200"></canvas>
+
   <script>
-    const eye=document.getElementById('eye');
-    const angle=document.getElementById('angle');
-    const eyeVal=document.getElementById('eyeVal');
-    const angleVal=document.getElementById('angleVal');
-    const motion=document.getElementById('motion');
-    const simulate=document.getElementById('simulate');
-    const reset=document.getElementById('reset');
-    const status=document.getElementById('status');
-    const desc=document.getElementById('desc');
-    const alertBox=document.getElementById('alertBox');
-    const teacherBtn=document.getElementById('teacherBtn');
-    const teacherPanel=document.getElementById('teacherPanel');
-    const studentList=document.getElementById('studentList');
+    const students = [
+      {num:1,name:'고은지'},{num:2,name:'권연서'},{num:3,name:'김가남'},{num:4,name:'김건우'},
+      {num:5,name:'김나연'},{num:6,name:'김현중'},{num:7,name:'김형민'},{num:8,name:'김효민'},
+      {num:9,name:'남시은'},{num:10,name:'박찬서'},{num:11,name:'박하을'},{num:12,name:'박호열'},
+      {num:13,name:'성하윤'},{num:14,name:'신주아'},{num:15,name:'신채아'},{num:16,name:'심인성'},
+      {num:17,name:'양지우'},{num:18,name:'이민호'},{num:19,name:'이성아'},{num:20,name:'이소이'},
+      {num:21,name:'이학현'},{num:22,name:'장윤서(전출)'},{num:23,name:'정예은'},{num:24,name:'정윤호'},
+      {num:25,name:'정지후'},{num:26,name:'정태윤'},{num:27,name:'조동호'},{num:28,name:'조수민'},
+      {num:29,name:'조현아'},{num:30,name:'최재민'},{num:31,name:'최재성'},{num:32,name:'허민'},
+      {num:33,name:'허승원'},{num:34,name:'홍성민'},{num:35,name:'강연두(전입)'}
+    ];
 
-    eye.addEventListener('input',()=>eyeVal.textContent=eye.value);
-    angle.addEventListener('input',()=>angleVal.textContent=angle.value);
-
-    simulate.addEventListener('click',()=>{
-      const eyeTime=Number(eye.value);
-      const headAngle=Number(angle.value);
-      const move=motion.checked;
-      status.textContent='분석 중...';
-      desc.textContent='AI가 얼굴과 자세 데이터를 분석 중입니다.';
-
-      setTimeout(()=>{
-        let sleepy=false;
-        if(eyeTime>=5 && headAngle>=30 && !move){sleepy=true;}
-
-        if(sleepy){
-          alertBox.style.display='block';
-          status.textContent='졸음 감지';
-          desc.textContent='5초 이상 눈을 감고 30° 이상 숙여 감지되었습니다.';
-          const students=studentList.getElementsByTagName('li');
-          students[1].innerHTML='2번 학생: 졸음 감지 🚨';
-        }else{
-          alertBox.style.display='none';
-          status.textContent='정상';
-          desc.textContent='졸음이 감지되지 않았습니다.';
-        }
-      },600);
+    const tbody = document.getElementById('studentList');
+    students.forEach(s => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>9</td><td>3</td><td>${s.num}</td><td>${s.name}</td>`;
+      tbody.appendChild(tr);
     });
 
-    reset.addEventListener('click',()=>{
-      eye.value=0; angle.value=0; motion.checked=false;
-      eyeVal.textContent='0'; angleVal.textContent='0';
-      alertBox.style.display='none';
-      status.textContent='대기 중'; desc.textContent='눈 감은 시간과 고개 각도를 조절해 시뮬레이션하세요.';
-      const students=studentList.getElementsByTagName('li');
-      students[0].innerHTML='1번 학생: 정상';
-      students[1].innerHTML='2번 학생: 정상';
-      students[2].innerHTML='3번 학생: 정상';
+    const monitor = document.getElementById('monitor');
+    const eye = document.getElementById('eyeTime');
+    const angle = document.getElementById('angle');
+    const move = document.getElementById('movement');
+    const status = document.getElementById('status');
+
+    let sleepData = new Array(students.length).fill(0);
+
+    function detect(){
+      const eyeTime = parseInt(eye.value);
+      const headAngle = parseInt(angle.value);
+      const moving = move.checked;
+      document.getElementById('eyeTimeVal').textContent = eyeTime;
+      document.getElementById('angleVal').textContent = headAngle;
+      if(eyeTime >= 5 && headAngle >= 30 && !moving){
+        status.textContent = '상태: 졸음 감지 🚨';
+        status.style.color = '#f87171';
+        const sleepyStudent = Math.floor(Math.random()*students.length);
+        monitor.innerHTML = `<p>${students[sleepyStudent].num}번 ${students[sleepyStudent].name} 졸음 감지 🚨</p>`;
+        sleepData[sleepyStudent]++;
+        updateChart();
+      } else {
+        status.textContent = '상태: 집중 중 ✅';
+        status.style.color = '#4ade80';
+      }
+    }
+
+    document.getElementById('startDetect').addEventListener('click', ()=>{
+      setInterval(detect, 2000); // 2초마다 감지 반복
     });
 
-    teacherBtn.addEventListener('click',()=>{
-      teacherPanel.style.display=teacherPanel.style.display==='block'?'none':'block';
+    const ctx = document.getElementById('sleepChart').getContext('2d');
+    const chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: students.map(s => s.num + '번'),
+        datasets: [{
+          label: '졸음 감지 횟수',
+          data: sleepData,
+          backgroundColor: '#60a5fa'
+        }]
+      },
+      options: {
+        scales: {
+          x: { ticks: { color: '#e2e8f0' } },
+          y: { ticks: { color: '#e2e8f0' } }
+        },
+        plugins: { legend: { labels: { color: '#e2e8f0' } } }
+      }
     });
+
+    function updateChart(){
+      chart.data.datasets[0].data = sleepData;
+      chart.update();
+    }
+
+    // 웹캠 연결 테스트
+    const webcam = document.getElementById('webcam');
+    navigator.mediaDevices.getUserMedia({video:true})
+      .then(stream => { webcam.srcObject = stream; })
+      .catch(err => { console.log('웹캠 접근 불가', err); });
   </script>
 </body>
 </html>
